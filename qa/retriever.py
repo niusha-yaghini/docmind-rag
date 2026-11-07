@@ -35,10 +35,14 @@ class HybridRetriever(BaseRetriever):
 
     k: int = Field(default_factory=lambda: settings.RETRIEVAL_TOP_K)
     candidates: int = Field(default_factory=lambda: settings.RETRIEVAL_CANDIDATES)
+    document_ids: list[int] | None = None  # restrict the search to these documents (used by the evaluation)
+
+    def _scope(self, queryset):
+        return queryset if self.document_ids is None else queryset.filter(document_id__in=self.document_ids)
 
     def _vector_ids(self, query_vector: list[float]) -> list[int]:
         qs = (
-            Chunk.objects.annotate(distance=CosineDistance("embedding", query_vector))
+            self._scope(Chunk.objects).annotate(distance=CosineDistance("embedding", query_vector))
             .order_by("distance")
             .values_list("id", flat=True)[: self.candidates]
         )
@@ -51,7 +55,7 @@ class HybridRetriever(BaseRetriever):
             return []
         tsquery = SearchQuery(" | ".join(words), config=FTS_CONFIG, search_type="raw")
         qs = (
-            Chunk.objects.filter(search_vector=tsquery)
+            self._scope(Chunk.objects).filter(search_vector=tsquery)
             .annotate(rank=SearchRank(F("search_vector"), tsquery))
             .order_by("-rank")
             .values_list("id", flat=True)[: self.candidates]
@@ -75,7 +79,7 @@ class HybridRetriever(BaseRetriever):
             k=settings.RRF_K,
         )
         keep = fused[: settings.RERANK_POOL] if settings.RERANK_ENABLED else fused[: self.k]
-        chunks = Chunk.objects.select_related("document").in_bulk([chunk_id for chunk_id, _ in keep])
+        chunks = self._scope(Chunk.objects).select_related("document").in_bulk([chunk_id for chunk_id, _ in keep])
         if settings.RERANK_ENABLED and len(keep) > 1:
             ordered = self._rerank(query, chunks, keep)
         else:

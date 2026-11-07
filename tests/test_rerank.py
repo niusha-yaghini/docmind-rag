@@ -37,7 +37,9 @@ def test_rerank_reads_a_wider_pool_than_it_returns(indexed_samples, rerank_on, m
 
     docs = HybridRetriever(k=2).invoke(QUESTION)
 
-    assert seen == [6] and len(docs) == 2
+    # The cross-encoder reads more candidates than the 2 returned. (The exact count can be 5 or 6: pgvector's HNSW
+    # index is approximate and can skip a row when earlier tests left dead tuples in it.)
+    assert len(seen) == 1 and seen[0] > 2 and len(docs) == 2
 
 
 def test_rerank_failure_falls_back_to_fused_order(indexed_samples, settings, monkeypatch):

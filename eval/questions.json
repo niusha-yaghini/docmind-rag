@@ -1,0 +1,106 @@
+[
+  {
+    "question": "How many vacation days do I get per year?",
+    "expect": "25 days of paid annual leave"
+  },
+  {
+    "question": "How many unused holiday days can I take into next year?",
+    "expect": "Up to 5 unused annual leave days"
+  },
+  {
+    "question": "Do I need a doctor's note when I am ill?",
+    "expect": "A medical certificate is required after 3 consecutive days"
+  },
+  {
+    "question": "How long is parental leave for the second parent?",
+    "expect": "the second parent receives 6 weeks"
+  },
+  {
+    "question": "By when must I hand in an expense claim?",
+    "expect": "within 30 days of the expense date"
+  },
+  {
+    "question": "From what amount do I need to attach a receipt?",
+    "expect": "itemised receipt is required for every expense above 25 USD"
+  },
+  {
+    "question": "What is the daily food allowance on business trips?",
+    "expect": "meals are reimbursed up to 60 USD per day"
+  },
+  {
+    "question": "Who has to approve expense claims over 500 USD?",
+    "expect": "Claims above 500 USD also need approval from the department director"
+  },
+  {
+    "question": "How far ahead do I have to book flights?",
+    "expect": "at least 14 days before departure"
+  },
+  {
+    "question": "What is the maximum price per night for a hotel in London?",
+    "expect": "250 USD per night in cities on the high-cost list"
+  },
+  {
+    "question": "When am I allowed to fly premium economy?",
+    "expect": "For flights of 6 hours or longer"
+  },
+  {
+    "question": "How quickly must a lost laptop be reported?",
+    "expect": "must be reported to the IT Service Desk within 24 hours"
+  },
+  {
+    "question": "How often do laptops get replaced?",
+    "expect": "Laptops are replaced every 36 months"
+  },
+  {
+    "question": "How long do I have to give back my equipment after I quit?",
+    "expect": "returned within 7 days after the last working day"
+  },
+  {
+    "question": "From what value do I have to declare a gift?",
+    "expect": "Gifts worth more than 50 USD"
+  },
+  {
+    "question": "Can I report misconduct without giving my name?",
+    "expect": "report a concern anonymously through the ethics hotline"
+  },
+  {
+    "question": "How many times a year are performance reviews held?",
+    "expect": "twice a year, in June and December"
+  },
+  {
+    "question": "How long do I have to appeal my rating?",
+    "expect": "appeal their rating within 14 days"
+  },
+  {
+    "question": "On which day of the month is the salary paid?",
+    "expect": "Salaries are paid on the 25th of each month"
+  },
+  {
+    "question": "How much extra is overtime paid?",
+    "expect": "1.5 times the normal hourly rate"
+  },
+  {
+    "question": "How soon must a workplace injury be reported?",
+    "expect": "Workplace injuries must be reported to the safety officer within 24 hours"
+  },
+  {
+    "question": "Where do we meet after the building is evacuated?",
+    "expect": "assembly point, which is car park B"
+  },
+  {
+    "question": "How many quotes do I need for a purchase of 8,000 dollars?",
+    "expect": "three written quotes from different vendors"
+  },
+  {
+    "question": "How long is customer data stored after the contract ends?",
+    "expect": "kept for 7 years after the contract ends"
+  },
+  {
+    "question": "How fast must a data breach be reported to the authorities?",
+    "expect": "within 72 hours of Acme becoming aware"
+  },
+  {
+    "question": "How quickly do you answer a customer's request to erase their data?",
+    "expect": "customer deletion requests within 30 days"
+  }
+]
