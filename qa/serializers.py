@@ -24,5 +24,6 @@ class SearchHitSerializer(serializers.Serializer):
     document_id = serializers.IntegerField()
     title = serializers.CharField()
     chunk_index = serializers.IntegerField()
-    score = serializers.FloatField()
+    score = serializers.FloatField(help_text="Fusion (RRF) score.")
+    rerank_score = serializers.FloatField(required=False, help_text="Cross-encoder score, present when reranking is on.")
     content = serializers.CharField()

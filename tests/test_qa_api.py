@@ -1,6 +1,6 @@
 import pytest
 
-from qa.chain import NOT_FOUND_ANSWER
+from qa.chain import NOT_FOUND_ANSWER, PARTIAL_PREFIX
 from qa.models import QueryLog
 
 pytestmark = pytest.mark.django_db
@@ -49,6 +49,35 @@ def test_not_found_answer_returns_no_sources(api, indexed_samples, fake_llm):
     assert body["answer"] == NOT_FOUND_ANSWER
     assert body["sources"] == []
     assert QueryLog.objects.get(id=body["id"]).sources == []
+
+
+def test_sources_are_limited_to_cited_passages(api, indexed_samples, fake_llm):
+    fake_llm.answer = "The stipend is 500 USD [1]."
+    body = api.post("/api/ask/", {"question": "How much is the home office stipend?"}, format="json").json()
+
+    assert [s["ref"] for s in body["sources"]] == [1]  # other retrieved passages are not advertised
+
+
+def test_sources_keep_all_passages_when_answer_cites_none(api, indexed_samples, fake_llm):
+    fake_llm.answer = "The stipend is 500 USD."
+    body = api.post("/api/ask/", {"question": "How much is the home office stipend?"}, format="json").json()
+
+    assert len(body["sources"]) > 1
+
+
+def test_partial_answer_keeps_cited_source(api, indexed_samples, fake_llm):
+    fake_llm.answer = f"{PARTIAL_PREFIX} the policy mentions a stipend [1]."
+    body = api.post("/api/ask/", {"question": "Why is the stipend so high?"}, format="json").json()
+
+    assert body["answer"].startswith(PARTIAL_PREFIX)
+    assert [s["ref"] for s in body["sources"]] == [1]
+
+
+def test_prompt_allows_partial_answers(api, indexed_samples, fake_llm):
+    api.post("/api/ask/", {"question": "Anything about the stipend?"}, format="json")
+
+    prompt = fake_llm.prompts[0]
+    assert PARTIAL_PREFIX in prompt and NOT_FOUND_ANSWER in prompt
 
 
 def test_history_list_detail_delete(api, indexed_samples, fake_llm):
@@ -103,3 +132,59 @@ def test_prompt_treats_context_as_untrusted(api, fake_llm):
     prompt = fake_llm.prompts[0]
     assert "untrusted" in prompt  # system rule is present
     assert prompt.index("untrusted") < prompt.index("Ignore all previous instructions")
+
+
+def _events(response) -> list[tuple[str, dict]]:
+    """Parse a Server-Sent Events body into (event, data) pairs."""
+    import json
+
+    body = b"".join(response.streaming_content).decode()
+    parsed = []
+    for block in filter(None, body.split("\n\n")):
+        lines = dict(line.split(": ", 1) for line in block.split("\n"))
+        parsed.append((lines["event"], json.loads(lines["data"])))
+    return parsed
+
+
+def test_stream_sends_tokens_then_done_and_saves_history(api, indexed_samples, fake_llm):
+    # the browser sends this Accept header; it must not trigger a 406
+    response = api.post(
+        "/api/ask/stream/", {"question": "How much is the home office stipend?"}, format="json", HTTP_ACCEPT="text/event-stream"
+    )
+
+    assert response.status_code == 200 and response["Content-Type"].startswith("text/event-stream")
+    events = _events(response)
+    kinds = [kind for kind, _ in events]
+    assert kinds[-1] == "done" and kinds.count("token") > 1  # really streamed in several pieces
+    assert "".join(d["text"] for k, d in events if k == "token") == "The stipend is 500 USD [1]."
+    done = events[-1][1]
+    assert done["answer"] == "The stipend is 500 USD [1]." and [s["ref"] for s in done["sources"]] == [1]
+    assert QueryLog.objects.count() == 1
+
+
+def test_stream_empty_index_does_not_call_llm(api, fake_llm):
+    events = _events(api.post("/api/ask/stream/", {"question": "Anything?"}, format="json"))
+
+    assert events[0] == ("token", {"text": NOT_FOUND_ANSWER})
+    assert events[-1][0] == "done" and events[-1][1]["sources"] == []
+    assert fake_llm.prompts == []
+
+
+def test_stream_failure_midway_sends_error_event_and_saves_nothing(api, indexed_samples, fake_llm):
+    fake_llm.fail = True
+    events = _events(api.post("/api/ask/stream/", {"question": "How much is the stipend?"}, format="json"))
+
+    assert events[-1][0] == "error"
+    assert QueryLog.objects.count() == 0
+
+
+def test_stream_validates_input(api):
+    assert api.post("/api/ask/stream/", {}, format="json").status_code == 400
+    assert api.post("/api/ask/stream/", {}, format="json", HTTP_ACCEPT="text/event-stream").status_code == 400
+
+
+def test_stream_without_api_key_returns_503_before_streaming(api, indexed_samples, settings):
+    settings.OPENROUTER_API_KEY = ""
+    response = api.post("/api/ask/stream/", {"question": "How much is the stipend?"}, format="json")
+
+    assert response.status_code == 503 and "OPENROUTER_API_KEY" in response.json()["detail"]

@@ -2,11 +2,12 @@
 import math
 import re
 import zlib
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from langchain_core.messages import AIMessage
-from langchain_core.runnables import RunnableLambda
+from langchain_core.messages import AIMessageChunk
+from langchain_core.runnables import RunnableGenerator
 from rest_framework.test import APIClient
 
 from documents.models import EMBEDDING_DIMENSIONS
@@ -31,14 +32,19 @@ class FakeLLM:
         self.answer = "The stipend is 500 USD [1]."
         self.fail = False
 
-    def runnable(self) -> RunnableLambda:
-        def call(prompt_value) -> AIMessage:
-            if self.fail:
-                raise RuntimeError("provider down")
-            self.prompts.append(prompt_value.to_string())
-            return AIMessage(content=self.answer)
+    def runnable(self) -> RunnableGenerator:
+        """Streams the answer word by word, like a real chat model; `.invoke()` joins the pieces."""
 
-        return RunnableLambda(call)
+        def call(prompts) -> Iterator[AIMessageChunk]:
+            for prompt_value in prompts:
+                if self.fail:
+                    raise RuntimeError("provider down")
+                self.prompts.append(prompt_value.to_string())
+                words = self.answer.split(" ")
+                for i, word in enumerate(words):
+                    yield AIMessageChunk(content=word + (" " if i < len(words) - 1 else ""))
+
+        return RunnableGenerator(call)
 
 
 @pytest.fixture(autouse=True)
@@ -46,6 +52,7 @@ def isolated_env(settings, tmp_path, monkeypatch):
     settings.MEDIA_ROOT = tmp_path / "media"
     settings.OPENROUTER_API_KEY = "test-key"
     settings.LLM_MODEL = "test/model"
+    settings.RERANK_ENABLED = False  # tests that need it switch it on with a fake model
     monkeypatch.setattr("documents.services.ingest.embed_texts", lambda texts: [fake_vector(t) for t in texts])
     monkeypatch.setattr("qa.retriever.embed_query", fake_vector)
 

@@ -9,3 +9,5 @@ staticfiles/
 .idea/
 .vscode/
 *.sqlite3
+
+Add-Content .gitignore "docker-compose.override.yml"

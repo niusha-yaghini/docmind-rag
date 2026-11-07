@@ -6,7 +6,7 @@ class QueryLog(models.Model):
 
     question = models.TextField()
     answer = models.TextField()
-    # [{"document_id", "title", "chunk_index", "score", "snippet"}, ...]
+    # [{"document_id", "title", "chunk_index", "score", "snippet", optional "rerank_score"}, ...]
     sources = models.JSONField(default=list, blank=True)
     model = models.CharField(max_length=255, blank=True)
     latency_ms = models.PositiveIntegerField(default=0)
