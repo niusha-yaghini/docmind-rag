@@ -1,0 +1,25 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}DocMind{% endblock %} · DocMind RAG</title>
+  <link rel="stylesheet" href="{% static 'web/app.css' %}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{% url 'web:chat' %}"><span class="logo">D</span> DocMind</a>
+    <nav>
+      <a href="{% url 'web:chat' %}" class="{% if active == 'chat' %}active{% endif %}">Ask</a>
+      <a href="{% url 'web:documents' %}" class="{% if active == 'documents' %}active{% endif %}">Documents</a>
+      <a href="{% url 'web:history' %}" class="{% if active == 'history' %}active{% endif %}">History</a>
+      <a href="/api/docs/">API</a>
+      <a href="/admin/">Admin</a>
+    </nav>
+  </header>
+  <main class="container">{% block content %}{% endblock %}</main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="{% static 'web/app.js' %}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,6 +1,6 @@
 import pytest
 
-from qa.chain import NOT_FOUND_ANSWER
+from qa.chain import NOT_FOUND_ANSWER, PARTIAL_PREFIX
 from qa.models import QueryLog
 
 pytestmark = pytest.mark.django_db
@@ -49,6 +49,35 @@ def test_not_found_answer_returns_no_sources(api, indexed_samples, fake_llm):
     assert body["answer"] == NOT_FOUND_ANSWER
     assert body["sources"] == []
     assert QueryLog.objects.get(id=body["id"]).sources == []
+
+
+def test_sources_are_limited_to_cited_passages(api, indexed_samples, fake_llm):
+    fake_llm.answer = "The stipend is 500 USD [1]."
+    body = api.post("/api/ask/", {"question": "How much is the home office stipend?"}, format="json").json()
+
+    assert [s["ref"] for s in body["sources"]] == [1]  # other retrieved passages are not advertised
+
+
+def test_sources_keep_all_passages_when_answer_cites_none(api, indexed_samples, fake_llm):
+    fake_llm.answer = "The stipend is 500 USD."
+    body = api.post("/api/ask/", {"question": "How much is the home office stipend?"}, format="json").json()
+
+    assert len(body["sources"]) > 1
+
+
+def test_partial_answer_keeps_cited_source(api, indexed_samples, fake_llm):
+    fake_llm.answer = f"{PARTIAL_PREFIX} the policy mentions a stipend [1]."
+    body = api.post("/api/ask/", {"question": "Why is the stipend so high?"}, format="json").json()
+
+    assert body["answer"].startswith(PARTIAL_PREFIX)
+    assert [s["ref"] for s in body["sources"]] == [1]
+
+
+def test_prompt_allows_partial_answers(api, indexed_samples, fake_llm):
+    api.post("/api/ask/", {"question": "Anything about the stipend?"}, format="json")
+
+    prompt = fake_llm.prompts[0]
+    assert PARTIAL_PREFIX in prompt and NOT_FOUND_ANSWER in prompt
 
 
 def test_history_list_detail_delete(api, indexed_samples, fake_llm):

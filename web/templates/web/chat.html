@@ -1,0 +1,64 @@
+{% extends "web/base.html" %}
+{% block title %}Ask{% endblock %}
+{% block content %}
+<h1>Ask your documents</h1>
+<p class="muted">Answers come only from your indexed documents, with the passages they were based on.</p>
+
+<form id="ask-form" class="card ask-form">
+  <textarea id="question" rows="3" maxlength="2000" placeholder="e.g. What is the monthly remote work stipend?" required></textarea>
+  <div class="row">
+    <span class="muted small" id="hint">Ctrl + Enter to send</span>
+    <button type="submit" id="ask-btn" class="btn primary">Ask</button>
+  </div>
+</form>
+
+<section id="thread" class="thread" aria-live="polite"></section>
+{% endblock %}
+{% block scripts %}
+<script>
+const form = document.getElementById("ask-form");
+const input = document.getElementById("question");
+const btn = document.getElementById("ask-btn");
+const thread = document.getElementById("thread");
+
+input.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") form.requestSubmit();
+});
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const question = input.value.trim();
+  if (!question) return;
+  btn.disabled = true; btn.textContent = "Thinking…";
+  const item = el("article", {class: "qa"}, [
+    el("div", {class: "q"}, [question]),
+    el("div", {class: "a pending"}, ["Searching the documents and generating an answer…"]),
+  ]);
+  thread.prepend(item);
+  input.value = "";
+  try {
+    const data = await api("/api/ask/", {method: "POST", json: {question}});
+    renderAnswer(item, data);
+  } catch (err) {
+    const a = item.querySelector(".a");
+    a.className = "a error"; a.textContent = err.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "Ask"; input.focus();
+  }
+});
+
+function renderAnswer(item, data) {
+  const a = item.querySelector(".a");
+  a.className = "a"; a.textContent = data.answer;
+  item.append(el("div", {class: "meta"}, [`${data.model} · ${(data.latency_ms / 1000).toFixed(1)} s`]));
+  if (data.sources.length) {
+    const box = el("details", {class: "sources", open: ""}, [el("summary", {}, [`Sources (${data.sources.length})`])]);
+    data.sources.forEach((s, i) => box.append(el("div", {class: "source"}, [
+      el("div", {class: "source-head"}, [`[${s.ref ?? i + 1}] ${s.title}`, el("span", {class: "badge"}, [`chunk ${s.chunk_index}`])]),
+      el("div", {class: "source-snippet"}, [s.snippet]),
+    ])));
+    item.append(box);
+  }
+}
+</script>
+{% endblock %}

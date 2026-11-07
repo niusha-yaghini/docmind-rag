@@ -1,0 +1,102 @@
+{% extends "web/base.html" %}
+{% block title %}Documents{% endblock %}
+{% block content %}
+<h1>Documents</h1>
+<p class="muted">Upload a .docx or paste text. Documents are split, embedded and indexed automatically.</p>
+
+<form id="upload-form" class="card">
+  <div class="grid">
+    <label>Title <span class="muted small">(optional)</span>
+      <input type="text" id="title" maxlength="255" placeholder="Defaults to the file name">
+    </label>
+    <label>.docx file
+      <input type="file" id="file" accept=".docx">
+    </label>
+  </div>
+  <label>…or paste text
+    <textarea id="text" rows="4" placeholder="Plain text content"></textarea>
+  </label>
+  <div class="row"><span class="muted small" id="upload-hint">Indexing takes a few seconds.</span>
+    <button type="submit" id="upload-btn" class="btn primary">Add document</button></div>
+</form>
+
+<div class="table-wrap card">
+  <table>
+    <thead><tr><th>Title</th><th>Status</th><th>Chunks</th><th>Updated</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p id="empty" class="muted pad" hidden>No documents yet.</p>
+</div>
+<button id="more" class="btn" hidden>Load more</button>
+{% endblock %}
+{% block scripts %}
+<script>
+const rows = document.getElementById("rows");
+const moreBtn = document.getElementById("more");
+let next = "/api/documents/?ordering=-created_at";
+
+function statusBadge(d) {
+  const b = el("span", {class: `badge ${d.status}`}, [d.status]);
+  if (d.status === "failed" && d.error) b.title = d.error;
+  return b;
+}
+
+function row(d) {
+  const tr = el("tr", {});
+  tr.append(el("td", {}, [d.title]));
+  tr.append(el("td", {}, [statusBadge(d)]));
+  tr.append(el("td", {}, [String(d.chunk_count)]));
+  tr.append(el("td", {class: "muted small"}, [new Date(d.updated_at).toLocaleString()]));
+  const actions = el("td", {class: "actions"});
+  const re = el("button", {class: "btn small"}, ["Re-index"]);
+  re.addEventListener("click", async () => {
+    re.disabled = true; re.textContent = "Indexing…";
+    try { const upd = await api(`/api/documents/${d.id}/reindex/`, {method: "POST"}); tr.replaceWith(row(upd)); toast("Re-indexed"); }
+    catch (err) { toast(err.message, true); re.disabled = false; re.textContent = "Re-index"; }
+  });
+  const del = el("button", {class: "btn small danger"}, ["Delete"]);
+  del.addEventListener("click", async () => {
+    if (!confirm(`Delete "${d.title}" and its index?`)) return;
+    try { await api(`/api/documents/${d.id}/`, {method: "DELETE"}); tr.remove(); syncEmpty(); }
+    catch (err) { toast(err.message, true); }
+  });
+  actions.append(re, del); tr.append(actions);
+  return tr;
+}
+
+function syncEmpty() { document.getElementById("empty").hidden = rows.children.length > 0; }
+
+async function load() {
+  moreBtn.disabled = true;
+  try {
+    const page = await api(next);
+    page.results.forEach((d) => rows.append(row(d)));
+    next = page.next ? new URL(page.next).pathname + new URL(page.next).search : null;
+    moreBtn.hidden = !next; syncEmpty();
+  } catch (err) { toast(err.message, true); }
+  moreBtn.disabled = false;
+}
+
+document.getElementById("upload-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const file = document.getElementById("file").files[0];
+  const text = document.getElementById("text").value.trim();
+  const title = document.getElementById("title").value.trim();
+  if (!file && !text) { toast("Choose a .docx file or paste some text.", true); return; }
+  const fd = new FormData();
+  if (title) fd.append("title", title);
+  if (file) fd.append("file", file); else fd.append("full_text", text);
+  const btn = document.getElementById("upload-btn");
+  btn.disabled = true; btn.textContent = "Indexing…";
+  try {
+    const doc = await api("/api/documents/", {method: "POST", body: fd});
+    rows.prepend(row(doc)); syncEmpty();
+    e.target.reset(); toast(doc.status === "indexed" ? "Document indexed" : "Saved, but indexing failed: " + (doc.error || ""), doc.status !== "indexed");
+  } catch (err) { toast(err.message, true); }
+  btn.disabled = false; btn.textContent = "Add document";
+});
+
+moreBtn.addEventListener("click", load);
+load();
+</script>
+{% endblock %}

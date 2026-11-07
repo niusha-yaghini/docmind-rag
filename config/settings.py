@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "documents",
     "qa",
+    "web",
 ]
 
 MIDDLEWARE = [

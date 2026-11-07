@@ -51,7 +51,10 @@ Migrations, static files and the admin user are handled automatically by `docker
 - **Hybrid retrieval** (`qa/retriever.py`): semantic search finds paraphrases, full-text search finds exact terms
   (numbers, names, "14 characters"). Each returns 20 candidates; Reciprocal Rank Fusion merges them and the top 5 go to the LLM.
 - **Chain** (`qa/chain.py`): one LangChain LCEL chain: retriever → prompt → LLM → parser. The prompt answers only from the
-  numbered passages, cites them, says so when the answer is missing, and treats the passages as untrusted text.
+  numbered passages and cites them. It has three outcomes: a full answer; a **partial answer** ("I don't have direct
+  information about this in the documents, but ..." plus what the documents do say); or the exact not-found sentence.
+  Passages are treated as untrusted text. The stored/returned sources are only the passages the answer cites
+  (none for a not-found answer).
 - **History**: every answer is saved in `QueryLog` with its sources, model and latency.
 
 ## API
@@ -82,6 +85,16 @@ curl "http://localhost:8000/api/search/?q=internet+allowance"
 
 Errors: `400` validation (bad file, empty body), `503` missing configuration (API key / model), `502` upstream
 LLM or embedding failure. Indexing problems never lose the document: it is saved with `status=failed` and a readable `error`.
+
+## Web UI
+
+A small dependency-free web interface (Django templates + vanilla JS calling the REST API) is served at `http://localhost:8000/`:
+
+- **Ask**: question box with the answer and the passages it was based on.
+- **Documents**: upload a `.docx` or paste text, see index status and chunk counts, re-index or delete.
+- **History**: all stored questions and answers.
+
+Django Admin (`/admin/`) and Swagger (`/api/docs/`) remain available. The UI lives in the `web/` app and adds no API endpoints.
 
 ## Admin
 

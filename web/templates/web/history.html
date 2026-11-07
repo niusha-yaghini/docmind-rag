@@ -1,0 +1,55 @@
+{% extends "web/base.html" %}
+{% block title %}History{% endblock %}
+{% block content %}
+<h1>Question history</h1>
+<p class="muted">Every question and answer is stored. Newest first.</p>
+<div id="list" class="thread"></div>
+<p id="empty" class="muted" hidden>No questions yet. Ask one on the <a href="{% url 'web:chat' %}">Ask</a> page.</p>
+<button id="more" class="btn" hidden>Load more</button>
+{% endblock %}
+{% block scripts %}
+<script>
+const list = document.getElementById("list");
+const moreBtn = document.getElementById("more");
+let next = "/api/history/";
+
+async function load() {
+  moreBtn.disabled = true;
+  try {
+    const page = await api(next);
+    page.results.forEach((r) => list.append(card(r)));
+    next = page.next ? new URL(page.next).pathname + new URL(page.next).search : null;
+    moreBtn.hidden = !next;
+    document.getElementById("empty").hidden = list.children.length > 0;
+  } catch (err) { toast(err.message, true); }
+  moreBtn.disabled = false;
+}
+
+function card(r) {
+  const node = el("article", {class: "qa"}, [
+    el("div", {class: "q"}, [r.question]),
+    el("div", {class: "a"}, [r.answer]),
+  ]);
+  const meta = el("div", {class: "meta"}, [`${new Date(r.created_at).toLocaleString()} · ${r.model} · ${(r.latency_ms / 1000).toFixed(1)} s`]);
+  const del = el("button", {class: "btn small danger"}, ["Delete"]);
+  del.addEventListener("click", async () => {
+    if (!confirm("Delete this entry?")) return;
+    try { await api(`/api/history/${r.id}/`, {method: "DELETE"}); node.remove(); }
+    catch (err) { toast(err.message, true); }
+  });
+  meta.append(del);
+  node.append(meta);
+  if (r.sources.length) {
+    const box = el("details", {class: "sources"}, [el("summary", {}, [`Sources (${r.sources.length})`])]);
+    r.sources.forEach((s, i) => box.append(el("div", {class: "source"}, [
+      el("div", {class: "source-head"}, [`[${s.ref ?? i + 1}] ${s.title}`, el("span", {class: "badge"}, [`chunk ${s.chunk_index}`])]),
+      el("div", {class: "source-snippet"}, [s.snippet]),
+    ])));
+    node.append(box);
+  }
+  return node;
+}
+moreBtn.addEventListener("click", load);
+load();
+</script>
+{% endblock %}
