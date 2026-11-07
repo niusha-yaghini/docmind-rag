@@ -37,3 +37,35 @@ function toast(message, isError = false) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.className = "toast"; }, 4500);
 }
+
+/* Streaming POST: reads a Server-Sent Events body incrementally.
+   EventSource cannot POST, so we use fetch + ReadableStream and split the text on blank lines ourselves. */
+async function streamSSE(url, json, handlers) {
+  let res;
+  try {
+    res = await fetch(url, {method: "POST", headers: {"Content-Type": "application/json", Accept: "text/event-stream"}, body: JSON.stringify(json)});
+  } catch { throw new Error("Cannot reach the server. Check that it is running."); }
+  if (!res.ok) {  // errors before the stream starts (400, 502, 503) are normal JSON
+    let data = null;
+    try { data = await res.json(); } catch { /* non-JSON body */ }
+    throw new Error(errorText(data, res.status));
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "", finished = false;
+  while (true) {
+    const {value, done} = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, {stream: true});
+    let end;
+    while ((end = buffer.indexOf("\n\n")) !== -1) {      // one complete event
+      const block = buffer.slice(0, end); buffer = buffer.slice(end + 2);
+      const event = /^event: (.*)$/m.exec(block)?.[1];
+      const data = /^data: (.*)$/m.exec(block)?.[1];
+      if (!event || data === undefined) continue;
+      if (event === "done" || event === "error") finished = true;
+      handlers[event]?.(JSON.parse(data));
+    }
+  }
+  if (!finished) throw new Error("The connection closed before the answer was complete.");
+}

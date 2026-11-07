@@ -36,12 +36,16 @@ form.addEventListener("submit", async (e) => {
   ]);
   thread.prepend(item);
   input.value = "";
+  const a = item.querySelector(".a");
+  let text = "";
   try {
-    const data = await api("/api/ask/", {method: "POST", json: {question}});
-    renderAnswer(item, data);
+    await streamSSE("/api/ask/stream/", {question}, {
+      token: ({text: piece}) => { text += piece; a.className = "a streaming"; a.textContent = text; },
+      done: (data) => renderAnswer(item, data),
+      error: ({detail}) => { throw new Error(detail); },
+    });
   } catch (err) {
-    const a = item.querySelector(".a");
-    a.className = "a error"; a.textContent = err.message;
+    a.className = "a error"; a.textContent = (text ? text + "\n\n" : "") + err.message;
   } finally {
     btn.disabled = false; btn.textContent = "Ask"; input.focus();
   }

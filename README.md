@@ -71,6 +71,7 @@ Interactive docs: `/api/docs/` (OpenAPI schema: `/api/schema/`). The API is open
 | `POST` | `/api/documents/{id}/reindex/` | Rebuild chunks/embeddings (e.g. after a failed indexing) |
 | `GET` | `/api/search/?q=...&k=5` | Most relevant chunks, no LLM call |
 | `POST` | `/api/ask/` | `{"question": "..."}` → answer, sources, model, latency; saved to history |
+| `POST` | `/api/ask/stream/` | Same as `/api/ask/`, but streams the answer as Server-Sent Events (`token`, then `done` or `error`). |
 | `GET` | `/api/history/` | Past questions and answers (newest first) |
 | `GET` `DELETE` | `/api/history/{id}/` | One history entry |
 

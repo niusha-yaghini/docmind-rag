@@ -132,3 +132,59 @@ def test_prompt_treats_context_as_untrusted(api, fake_llm):
     prompt = fake_llm.prompts[0]
     assert "untrusted" in prompt  # system rule is present
     assert prompt.index("untrusted") < prompt.index("Ignore all previous instructions")
+
+
+def _events(response) -> list[tuple[str, dict]]:
+    """Parse a Server-Sent Events body into (event, data) pairs."""
+    import json
+
+    body = b"".join(response.streaming_content).decode()
+    parsed = []
+    for block in filter(None, body.split("\n\n")):
+        lines = dict(line.split(": ", 1) for line in block.split("\n"))
+        parsed.append((lines["event"], json.loads(lines["data"])))
+    return parsed
+
+
+def test_stream_sends_tokens_then_done_and_saves_history(api, indexed_samples, fake_llm):
+    # the browser sends this Accept header; it must not trigger a 406
+    response = api.post(
+        "/api/ask/stream/", {"question": "How much is the home office stipend?"}, format="json", HTTP_ACCEPT="text/event-stream"
+    )
+
+    assert response.status_code == 200 and response["Content-Type"].startswith("text/event-stream")
+    events = _events(response)
+    kinds = [kind for kind, _ in events]
+    assert kinds[-1] == "done" and kinds.count("token") > 1  # really streamed in several pieces
+    assert "".join(d["text"] for k, d in events if k == "token") == "The stipend is 500 USD [1]."
+    done = events[-1][1]
+    assert done["answer"] == "The stipend is 500 USD [1]." and [s["ref"] for s in done["sources"]] == [1]
+    assert QueryLog.objects.count() == 1
+
+
+def test_stream_empty_index_does_not_call_llm(api, fake_llm):
+    events = _events(api.post("/api/ask/stream/", {"question": "Anything?"}, format="json"))
+
+    assert events[0] == ("token", {"text": NOT_FOUND_ANSWER})
+    assert events[-1][0] == "done" and events[-1][1]["sources"] == []
+    assert fake_llm.prompts == []
+
+
+def test_stream_failure_midway_sends_error_event_and_saves_nothing(api, indexed_samples, fake_llm):
+    fake_llm.fail = True
+    events = _events(api.post("/api/ask/stream/", {"question": "How much is the stipend?"}, format="json"))
+
+    assert events[-1][0] == "error"
+    assert QueryLog.objects.count() == 0
+
+
+def test_stream_validates_input(api):
+    assert api.post("/api/ask/stream/", {}, format="json").status_code == 400
+    assert api.post("/api/ask/stream/", {}, format="json", HTTP_ACCEPT="text/event-stream").status_code == 400
+
+
+def test_stream_without_api_key_returns_503_before_streaming(api, indexed_samples, settings):
+    settings.OPENROUTER_API_KEY = ""
+    response = api.post("/api/ask/stream/", {"question": "How much is the stipend?"}, format="json")
+
+    assert response.status_code == 503 and "OPENROUTER_API_KEY" in response.json()["detail"]

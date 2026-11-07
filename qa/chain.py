@@ -33,8 +33,13 @@ def format_context(docs: list[LCDocument]) -> str:
     return "\n\n".join(f"[{i}] (source: {d.metadata['title']})\n{d.page_content}" for i, d in enumerate(docs, start=1))
 
 
+def build_answer_chain() -> Runnable:
+    """prompt -> LLM -> text. `.invoke()` returns the whole answer, `.stream()` yields it piece by piece."""
+    return PROMPT | get_llm() | StrOutputParser()
+
+
 def build_chain() -> Runnable:
-    answer_chain = PROMPT | get_llm() | StrOutputParser()
+    answer_chain = build_answer_chain()
 
     def generate(inputs: dict) -> str:
         if not inputs["docs"]:  # empty index: do not spend an LLM call
