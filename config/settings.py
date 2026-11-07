@@ -142,6 +142,10 @@ CHUNK_OVERLAP = int(env("CHUNK_OVERLAP", "150"))
 RETRIEVAL_CANDIDATES = int(env("RETRIEVAL_CANDIDATES", "20"))
 RETRIEVAL_TOP_K = int(env("RETRIEVAL_TOP_K", "5"))
 RRF_K = 60
+# Second retrieval stage: a local cross-encoder re-scores the best fused candidates (see qa/reranker.py).
+RERANK_ENABLED = env("RERANK_ENABLED", "true").lower() in ("1", "true", "yes")
+RERANK_MODEL = env("RERANK_MODEL", "Xenova/ms-marco-MiniLM-L-6-v2")
+RERANK_POOL = int(env("RERANK_POOL", "20"))  # how many fused candidates are re-scored
 
 MAX_UPLOAD_BYTES = int(env("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_BYTES

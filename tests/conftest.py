@@ -52,6 +52,7 @@ def isolated_env(settings, tmp_path, monkeypatch):
     settings.MEDIA_ROOT = tmp_path / "media"
     settings.OPENROUTER_API_KEY = "test-key"
     settings.LLM_MODEL = "test/model"
+    settings.RERANK_ENABLED = False  # tests that need it switch it on with a fake model
     monkeypatch.setattr("documents.services.ingest.embed_texts", lambda texts: [fake_vector(t) for t in texts])
     monkeypatch.setattr("qa.retriever.embed_query", fake_vector)
 

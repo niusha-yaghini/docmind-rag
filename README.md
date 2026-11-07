@@ -35,6 +35,30 @@ The UI is the Django Admin; everything is also available through a REST API with
 
 Migrations, static files and the admin user are handled automatically by `docker/entrypoint.sh`.
 
+## Build notes: PyPI mirror
+
+The `Dockerfile` installs Python dependencies from the Tsinghua PyPI mirror
+(`https://pypi.tuna.tsinghua.edu.cn/simple`) instead of the default PyPI index.
+The packages and pinned versions in `requirements.txt` are identical; only the
+download host differs. This was chosen because `files.pythonhosted.org` was not
+reachable from the development network.
+
+If your network can reach the official PyPI and you prefer it, change this line
+in the `Dockerfile`:
+
+    --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+to:
+
+    --index-url https://pypi.org/simple
+
+and rebuild with `docker compose build --no-cache`.
+
+The cross-encoder reranker model (`Xenova/ms-marco-MiniLM-L-6-v2`, ~80 MB) is
+downloaded from Hugging Face during the image build. If that download fails
+(offline build), the build still succeeds and the app falls back to the plain
+hybrid-retrieval order (reranking is skipped, with a warning in the logs).
+
 ## How it works
 
 ```
