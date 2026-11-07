@@ -61,3 +61,17 @@ def test_rerank_disabled_never_calls_the_model(indexed_samples, settings, monkey
     docs = HybridRetriever().invoke(QUESTION)
 
     assert docs and all("rerank_score" not in d.metadata for d in docs)
+
+
+def test_saved_sources_carry_the_rerank_score_when_reranking_ran(api, indexed_samples, fake_llm, rerank_on):
+    fake_llm.answer = "Passwords need at least 14 characters [1]."
+    body = api.post("/api/ask/", {"question": QUESTION}, format="json").json()
+
+    assert body["sources"][0]["rerank_score"] == 10.0
+
+
+def test_saved_sources_have_no_rerank_score_when_reranking_is_off(api, indexed_samples, fake_llm):
+    fake_llm.answer = "Passwords need at least 14 characters [1]."
+    body = api.post("/api/ask/", {"question": QUESTION}, format="json").json()
+
+    assert "rerank_score" not in body["sources"][0]

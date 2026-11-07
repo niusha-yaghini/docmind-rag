@@ -35,30 +35,6 @@ The UI is the Django Admin; everything is also available through a REST API with
 
 Migrations, static files and the admin user are handled automatically by `docker/entrypoint.sh`.
 
-## Build notes: PyPI mirror
-
-The `Dockerfile` installs Python dependencies from the Tsinghua PyPI mirror
-(`https://pypi.tuna.tsinghua.edu.cn/simple`) instead of the default PyPI index.
-The packages and pinned versions in `requirements.txt` are identical; only the
-download host differs. This was chosen because `files.pythonhosted.org` was not
-reachable from the development network.
-
-If your network can reach the official PyPI and you prefer it, change this line
-in the `Dockerfile`:
-
-    --index-url https://pypi.tuna.tsinghua.edu.cn/simple
-
-to:
-
-    --index-url https://pypi.org/simple
-
-and rebuild with `docker compose build --no-cache`.
-
-The cross-encoder reranker model (`Xenova/ms-marco-MiniLM-L-6-v2`, ~80 MB) is
-downloaded from Hugging Face during the image build. If that download fails
-(offline build), the build still succeeds and the app falls back to the plain
-hybrid-retrieval order (reranking is skipped, with a warning in the logs).
-
 ## How it works
 
 ```
@@ -73,7 +49,14 @@ hybrid-retrieval order (reranking is skipped, with a warning in the logs).
 
 - **Full text** of each document is stored on `Document.full_text`; chunks live in `Chunk`.
 - **Hybrid retrieval** (`qa/retriever.py`): semantic search finds paraphrases, full-text search finds exact terms
-  (numbers, names, "14 characters"). Each returns 20 candidates; Reciprocal Rank Fusion merges them and the top 5 go to the LLM.
+  (numbers, names, "14 characters"). Each returns 20 candidates; Reciprocal Rank Fusion merges them.
+- **Reranking** (`qa/reranker.py`): the fused top 20 are re-scored by a local cross-encoder
+  (`Xenova/ms-marco-MiniLM-L-6-v2`, run with fastembed/ONNX, no API call). It reads the question and each passage
+  together and outputs a relevance score (higher = more relevant, above 0 is usually a real match); the best 5 go to
+  the LLM. Stored embeddings are not changed, only the order. If the model is unavailable the retriever falls back to the
+  fused order with a logged warning. Each source shows its score as a "relevance" badge in the UI and as `rerank_score`
+  in `/api/search/` and in the saved sources. The model is English-only; for other languages set `RERANK_MODEL` to a
+  multilingual reranker supported by fastembed.
 - **Chain** (`qa/chain.py`): one LangChain LCEL chain: retriever → prompt → LLM → parser. The prompt answers only from the
   numbered passages and cites them. It has three outcomes: a full answer; a **partial answer** ("I don't have direct
   information about this in the documents, but ..." plus what the documents do say); or the exact not-found sentence.
@@ -140,6 +123,7 @@ All settings are environment variables, documented in [`.env.example`](.env.exam
 | `EMBEDDING_MODEL`, `EMBEDDING_DIM` | Default `liquid/lfm-2.5-embedding-350m:free`, 1024 dims. See the note below before changing |
 | `CHUNK_SIZE`, `CHUNK_OVERLAP` | Chunking (characters), default 1000 / 150 |
 | `RETRIEVAL_CANDIDATES`, `RETRIEVAL_TOP_K` | Per-retriever candidates (20) and chunks sent to the LLM (5) |
+| `RERANK_ENABLED`, `RERANK_MODEL`, `RERANK_POOL` | Cross-encoder reranking on/off (default on), its model, and how many fused candidates it re-scores (20) |
 
 Changing the embedding model to one with a different dimension requires editing `EMBEDDING_DIMENSIONS` in
 `documents/models.py`, creating a migration, and re-indexing all documents.
@@ -173,7 +157,7 @@ Locally (needs Postgres with the pgvector extension): `pip install -r requiremen
 - Free OpenRouter models are rate limited and can be unavailable; use `LLM_FALLBACK_MODELS`. Free embedding endpoints may
   retain data, so do not upload confidential documents.
 - Indexing blocks the request; large files would need a task queue (Celery/RQ).
-- The API has no authentication. Next: token auth, per-user documents, streaming answers, a reranker, conversation memory, PDF support.
+- The API has no authentication. Next: token auth, per-user documents, conversation memory, PDF support.
 
 ## Project layout
 

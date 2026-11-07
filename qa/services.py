@@ -30,6 +30,8 @@ def _save(question: str, answer: str, docs: list[LCDocument], started: float) ->
             "chunk_index": doc.metadata["chunk_index"],
             "score": doc.metadata["score"],
             "snippet": doc.page_content[:SNIPPET_CHARS],
+            # Cross-encoder relevance; only present when reranking ran.
+            **({"rerank_score": doc.metadata["rerank_score"]} if "rerank_score" in doc.metadata else {}),
         }
         for n, doc in numbered
     ]

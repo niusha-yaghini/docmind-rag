@@ -42,7 +42,7 @@ function card(r) {
   if (r.sources.length) {
     const box = el("details", {class: "sources"}, [el("summary", {}, [`Sources (${r.sources.length})`])]);
     r.sources.forEach((s, i) => box.append(el("div", {class: "source"}, [
-      el("div", {class: "source-head"}, [`[${s.ref ?? i + 1}] ${s.title}`, el("span", {class: "badge"}, [`chunk ${s.chunk_index}`])]),
+      el("div", {class: "source-head"}, [`[${s.ref ?? i + 1}] ${s.title}`, el("span", {class: "badge"}, [`chunk ${s.chunk_index}`]), ...(s.rerank_score != null ? [el("span", {class: "badge rerank", title: "Cross-encoder relevance score (higher = more relevant; above 0 is usually a real match)"}, [`relevance ${s.rerank_score.toFixed(1)}`])] : [])]),
       el("div", {class: "source-snippet"}, [s.snippet]),
     ])));
     node.append(box);
