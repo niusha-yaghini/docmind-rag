@@ -2,7 +2,7 @@ import time
 
 from django.conf import settings
 
-from qa.chain import build_chain
+from qa.chain import NOT_FOUND_ANSWER, build_chain
 from qa.models import QueryLog
 
 SNIPPET_CHARS = 300
@@ -22,9 +22,12 @@ def answer_question(question: str) -> QueryLog:
         }
         for doc in result["docs"]
     ]
+    answer = result["answer"].strip()
+    if answer.startswith(NOT_FOUND_ANSWER.rstrip(".")):
+        sources = []  # a refusal must not advertise unrelated passages as sources
     return QueryLog.objects.create(
         question=question,
-        answer=result["answer"].strip(),
+        answer=answer,
         sources=sources,
         model=settings.LLM_MODEL,
         latency_ms=int((time.perf_counter() - started) * 1000),

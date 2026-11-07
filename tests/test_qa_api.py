@@ -42,6 +42,15 @@ def test_ask_returns_answer_sources_and_saves_history(api, indexed_samples, fake
     assert QueryLog.objects.count() == 1
 
 
+def test_not_found_answer_returns_no_sources(api, indexed_samples, fake_llm):
+    fake_llm.answer = NOT_FOUND_ANSWER
+    body = api.post("/api/ask/", {"question": "What colour is the CEO's car?"}, format="json").json()
+
+    assert body["answer"] == NOT_FOUND_ANSWER
+    assert body["sources"] == []
+    assert QueryLog.objects.get(id=body["id"]).sources == []
+
+
 def test_history_list_detail_delete(api, indexed_samples, fake_llm):
     first = api.post("/api/ask/", {"question": "first question"}, format="json").json()
     second = api.post("/api/ask/", {"question": "second question"}, format="json").json()
